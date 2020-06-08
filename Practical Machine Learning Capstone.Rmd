@@ -1,0 +1,134 @@
+---
+title: "Practical Machine Learning - Capstone Project"
+author: "Sean Dobbs"
+date: "6/6/2020"
+output: html_document
+---
+
+```{r required packages, echo = FALSE, message = FALSE, warning = FALSE}
+require(caret)
+require(dplyr)
+require(data.table)
+require(kernlab)
+require(rattle)
+```
+
+## Background, Purpose, and Data Preprocessing
+
+  Data for this project were generously made available from the following source:
+
+*Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements. Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. DOI: 10.1007/978-3-642-34459-6_6.*
+
+*Read more: http://groupware.les.inf.puc-rio.br/har#ixzz*
+  
+  Myriad readings from six(6) users executing dumbbell lifts, both correctly and incorrectly, were gathered from accelerometers mounted on the belt, forearm, arm, and the dumbbell itself. The data was split into a very large training set (over 19,000 rows - which will be partitioned and split further into a training and test set; 75% into the training set, and the remaining 25% into the testing set), and a small 20 row "testing" set (which will actually be used one by one to provide 20 individual predictions), and both were downloaded for use. 
+  
+  Additionally, there a large number of columns that serve to do nothing but mess up the prediction algorithms (timestamps, e.g) or have a massive majority of the entries being "NA" or NULL. So, those columns were removed from all of the data sets (see Appendix A for the code and columns removed):
+
+```{r download read training and test data sets, echo = FALSE, message = FALSE}
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "PMLtrain.csv")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "PMLtest.csv")
+PMLquizcases <- data.table(read.csv("PMLtest.csv"))
+PMLtrain <- data.table(read.csv("PMLtrain.csv"))
+PMLtrain <- select(PMLtrain, -c("var_roll_arm",	"avg_pitch_arm",	"stddev_pitch_arm",	"var_pitch_arm",	"avg_yaw_arm",	"stddev_yaw_arm",	"var_yaw_arm",	"kurtosis_roll_arm",	"kurtosis_picth_arm",	"kurtosis_yaw_arm",	"skewness_roll_arm",	"skewness_pitch_arm",	"skewness_yaw_arm",	"max_roll_arm",	"max_picth_arm",	"max_yaw_arm",	"min_roll_arm",	"min_pitch_arm",	"min_yaw_arm",	"amplitude_roll_arm",	"amplitude_pitch_arm",	"amplitude_yaw_arm",	"kurtosis_roll_dumbbell",	"kurtosis_picth_dumbbell",	"kurtosis_yaw_dumbbell",	"skewness_roll_dumbbell",	"skewness_pitch_dumbbell",	"skewness_yaw_dumbbell",	"max_roll_dumbbell",	"max_picth_dumbbell",	"max_yaw_dumbbell",	"min_roll_dumbbell",	"min_pitch_dumbbell",	"min_yaw_dumbbell",	"amplitude_roll_dumbbell",	"amplitude_pitch_dumbbell",	"amplitude_yaw_dumbbell",	"var_accel_dumbbell",	"avg_roll_dumbbell",	"stddev_roll_dumbbell",	"var_roll_dumbbell",	"avg_pitch_dumbbell",	"stddev_pitch_dumbbell",	"var_pitch_dumbbell",	"avg_yaw_dumbbell",	"stddev_yaw_dumbbell",	"var_yaw_dumbbell",	"kurtosis_roll_forearm",	"kurtosis_picth_forearm",	"kurtosis_yaw_forearm",	"skewness_roll_forearm",	"skewness_pitch_forearm",	"skewness_yaw_forearm",	"max_roll_forearm",	"max_picth_forearm",	"max_yaw_forearm",	"min_roll_forearm",	"min_pitch_forearm",	"min_yaw_forearm",	"amplitude_roll_forearm",	"amplitude_pitch_forearm",	"amplitude_yaw_forearm",	"var_accel_forearm",	"avg_roll_forearm",	"stddev_roll_forearm",	"var_roll_forearm",	"avg_pitch_forearm",	"stddev_pitch_forearm",	"var_pitch_forearm",	"avg_yaw_forearm",	"stddev_yaw_forearm",	"var_yaw_forearm", "kurtosis_picth_belt",	"kurtosis_yaw_belt",	"skewness_roll_belt",	"skewness_roll_belt.1",	"skewness_yaw_belt",	"max_roll_belt",	"max_picth_belt",	"max_yaw_belt",	"min_roll_belt",	"min_pitch_belt",	"min_yaw_belt",	"amplitude_roll_belt",	"amplitude_pitch_belt",	"amplitude_yaw_belt",	"var_total_accel_belt",	"avg_roll_belt",	"stddev_roll_belt",	"var_roll_belt",	"avg_pitch_belt",	"stddev_pitch_belt",	"var_pitch_belt",	"avg_yaw_belt",	"stddev_yaw_belt",	"var_yaw_belt",	"var_accel_arm",	"avg_roll_arm",	"stddev_roll_arm", "kurtosis_picth_belt",	"kurtosis_yaw_belt",	"skewness_roll_belt",	"skewness_roll_belt.1",	"skewness_yaw_belt",	"max_roll_belt",	"max_picth_belt",	"max_yaw_belt",	"min_roll_belt",	"min_pitch_belt",	"min_yaw_belt",	"amplitude_roll_belt",	"amplitude_pitch_belt",	"amplitude_yaw_belt",	"var_total_accel_belt",	"avg_roll_belt",	"stddev_roll_belt",	"var_roll_belt",	"avg_pitch_belt",	"stddev_pitch_belt",	"var_pitch_belt",	"avg_yaw_belt",	"stddev_yaw_belt",	"var_yaw_belt",	"var_accel_arm",	"avg_roll_arm",	"stddev_roll_arm", "kurtosis_roll_belt", "raw_timestamp_part_1","raw_timestamp_part_2","cvtd_timestamp","X"))
+PMLquizcases <- select(PMLquizcases, -c("var_roll_arm",	"avg_pitch_arm",	"stddev_pitch_arm",	"var_pitch_arm",	"avg_yaw_arm",	"stddev_yaw_arm",	"var_yaw_arm",	"kurtosis_roll_arm",	"kurtosis_picth_arm",	"kurtosis_yaw_arm",	"skewness_roll_arm",	"skewness_pitch_arm",	"skewness_yaw_arm",	"max_roll_arm",	"max_picth_arm",	"max_yaw_arm",	"min_roll_arm",	"min_pitch_arm",	"min_yaw_arm",	"amplitude_roll_arm",	"amplitude_pitch_arm",	"amplitude_yaw_arm",	"kurtosis_roll_dumbbell",	"kurtosis_picth_dumbbell",	"kurtosis_yaw_dumbbell",	"skewness_roll_dumbbell",	"skewness_pitch_dumbbell",	"skewness_yaw_dumbbell",	"max_roll_dumbbell",	"max_picth_dumbbell",	"max_yaw_dumbbell",	"min_roll_dumbbell",	"min_pitch_dumbbell",	"min_yaw_dumbbell",	"amplitude_roll_dumbbell",	"amplitude_pitch_dumbbell",	"amplitude_yaw_dumbbell",	"var_accel_dumbbell",	"avg_roll_dumbbell",	"stddev_roll_dumbbell",	"var_roll_dumbbell",	"avg_pitch_dumbbell",	"stddev_pitch_dumbbell",	"var_pitch_dumbbell",	"avg_yaw_dumbbell",	"stddev_yaw_dumbbell",	"var_yaw_dumbbell",	"kurtosis_roll_forearm",	"kurtosis_picth_forearm",	"kurtosis_yaw_forearm",	"skewness_roll_forearm",	"skewness_pitch_forearm",	"skewness_yaw_forearm",	"max_roll_forearm",	"max_picth_forearm",	"max_yaw_forearm",	"min_roll_forearm",	"min_pitch_forearm",	"min_yaw_forearm",	"amplitude_roll_forearm",	"amplitude_pitch_forearm",	"amplitude_yaw_forearm",	"var_accel_forearm",	"avg_roll_forearm",	"stddev_roll_forearm",	"var_roll_forearm",	"avg_pitch_forearm",	"stddev_pitch_forearm",	"var_pitch_forearm",	"avg_yaw_forearm",	"stddev_yaw_forearm",	"var_yaw_forearm", "kurtosis_picth_belt",	"kurtosis_yaw_belt",	"skewness_roll_belt",	"skewness_roll_belt.1",	"skewness_yaw_belt",	"max_roll_belt",	"max_picth_belt",	"max_yaw_belt",	"min_roll_belt",	"min_pitch_belt",	"min_yaw_belt",	"amplitude_roll_belt",	"amplitude_pitch_belt",	"amplitude_yaw_belt",	"var_total_accel_belt",	"avg_roll_belt",	"stddev_roll_belt",	"var_roll_belt",	"avg_pitch_belt",	"stddev_pitch_belt",	"var_pitch_belt",	"avg_yaw_belt",	"stddev_yaw_belt",	"var_yaw_belt",	"var_accel_arm",	"avg_roll_arm",	"stddev_roll_arm", "kurtosis_picth_belt",	"kurtosis_yaw_belt",	"skewness_roll_belt",	"skewness_roll_belt.1",	"skewness_yaw_belt",	"max_roll_belt",	"max_picth_belt",	"max_yaw_belt",	"min_roll_belt",	"min_pitch_belt",	"min_yaw_belt",	"amplitude_roll_belt",	"amplitude_pitch_belt",	"amplitude_yaw_belt",	"var_total_accel_belt",	"avg_roll_belt",	"stddev_roll_belt",	"var_roll_belt",	"avg_pitch_belt",	"stddev_pitch_belt",	"var_pitch_belt",	"avg_yaw_belt",	"stddev_yaw_belt",	"var_yaw_belt",	"var_accel_arm",	"avg_roll_arm",	"stddev_roll_arm", "kurtosis_roll_belt", "raw_timestamp_part_1","raw_timestamp_part_2","cvtd_timestamp","X"))
+set.seed(1976)
+inTrain <- createDataPartition(y = PMLtrain$classe, p = 0.75, list = FALSE)
+PMLtraining <- PMLtrain[inTrain,]
+PMLtesting <- PMLtrain[-inTrain,]
+```
+
+  The goal of this process is to use the information given in the training set to ascertain the fashion in which the exercise was done, given a set of predictors in the testing data set. The possible fashions in which the exercises were done are:
+  
+  Class A: Exactly According To Specification   
+  Class B: Throwing Elbows To Front   
+  Class C: Lifting Dumbbell Only Halfway   
+  Class D: Lowering Dumbbell Only Halfway   
+  Class E: Throwing Hips To Front   
+
+  In order to hopefully obtain the most accuracy, models will be fit, using three methods that are usually useful when the predicted outcome is categorical in nature and the data set is large, namely: Trees, Random Forest, and Logistic Regression (specifically, Multinomial Logistic Regression). Then the models, if reasonably accurate (but none are overwhelmingly accurate on their own) will be stacked to potentially increase accuracy further.
+
+## RPART (Trees) Model Building and Analysis 
+
+  The first model was fit using the RPART (Trees) method:
+  
+```{r RPART model building, echo = FALSE}
+RPARTmodel <- train(classe ~.,method = "rpart", data = PMLtraining)
+fancyRpartPlot(RPARTmodel$finalModel, main = "RPART Model")
+RPARTpred <- predict(RPARTmodel, newdata = PMLtesting)
+```
+
+***RPART Method Confusion Matrix Overview***
+```{r RPART confusion matrices, echo = FALSE}
+confusionMatrix(PMLtesting$classe,RPARTpred)$table
+confusionMatrix(PMLtesting$classe,RPARTpred)$overall
+```
+
+***Distribution of Actual Classes From Training Data Set***
+```{r actual reference training data, echo = FALSE}
+summary(PMLtraining$classe)
+``` 
+  Three things are immediately alarming, and make it obvious that the RPART method won't be useful:   
+    1. The model never chooses Class D (and almost never chooses Class E), which cannot be accurate   
+    2. The overall accuracy of the model is a bit worse than a coin flip   
+    3. When the model ***does*** choose Class E, it's remarkably accurate; thus, for the other four classes, the model is especially dismal  
+
+## Random Forest Model Building and Analysis
+
+  The second model was fit using the Random Forest method:
+
+```{r RF model building, echo = FALSE}
+RFmodel <- train(classe ~.,method = "rf", ntree = 10, data = PMLtraining)
+RFpred <- predict(RFmodel, newdata = PMLtesting)
+```
+*note: 20 trees was also tried; accuracy increased infinitesimally, but processing time (which was already a couple minutes) increased exponentially.*
+
+***Random Forest Method Confusion Matrix Overview***
+```{r RF confusion matrices, echo = FALSE}
+confusionMatrix(PMLtesting$classe,RFpred)$table
+confusionMatrix(PMLtesting$classe,RFpred)$overall
+```
+  It appears that the Random Forest method is massively accurate, with only 23 of the 4904 predictions being wrong. To be sure, a cross-validation method, k-fold, was executed on this model.
+```{r RF cross validation, echo = FALSE}
+train_control <- trainControl(method="cv", number=10)
+RFmodelCV <- train(classe ~.,method = "rf",trControl = train_control, ntree = 10, data = PMLtraining)
+print(RFmodelCV)
+```  
+  Indeed, the accuracy of the Random Forest method for this data set is validated.
+
+## Multinomial Logistic Regression Method Building and Analysis
+
+  The third and final model was fit using the Multinomial Logistic Regression method. BoxCox preprocessing was added to the model training, as, unlike with the Tree/Forest methods, Logistic Regression models seldom do well without preprocessing:
+
+```{r MLR model building, echo = FALSE, warning = FALSE, message = FALSE, results = FALSE}
+MLRmodel <- train(classe ~.,method = "multinom", preProcess = "BoxCox", data = PMLtraining)
+MLRpred <- predict(MLRmodel, newdata = PMLtesting)
+```
+
+***Multinomial Logistic Regression Method Confusion Matrix Overview***
+```{r MLR confusion matrices, echo = FALSE, warning = FALSE}
+confusionMatrix(PMLtesting$classe,MLRpred)$table
+confusionMatrix(PMLtesting$classe,MLRpred)$overall
+```
+  The Multivariate Logistic Regression method is 66% accurate. Not bad, surely, but nowhere near the accuracy seen with the Random Forest method. Another cross-validation method, a repeated k-Fold Cross Validation, was executed on the Multinomial Logistic Regression fit:
+
+```{r MLR cross validation, echo = FALSE, warning = FALSE, message = FALSE, results = FALSE}
+train_control_MLR <- trainControl(method="repeatedcv", number=10, repeats=3)
+MLRmodelCV <- train(classe ~.,method = "multinom",trControl = train_control_MLR, data = PMLtraining)
+```
+```{r MLR CV show, echo = FALSE}
+print(MLRmodelCV)
+```  
+  A similar 67% accuracy for the true identification of the "classe" variable emerges.
+
+## Conclusion
+
+Among the methods considered, the Random Forest method is hands-down the most accurate. Additionally, for this data set, the Random Forest method was extraordinarily accurate. Thus, no model stacking was considered, and the Random Forest method alone was chosen as the best predictor for this data set. 
+
+## Appendix
+
+1. Data cleaning detail
+
+PMLtrain <- select(PMLtrain, -c("var_roll_arm",	"avg_pitch_arm",	"stddev_pitch_arm",	"var_pitch_arm",	"avg_yaw_arm",	"stddev_yaw_arm",	"var_yaw_arm",	"kurtosis_roll_arm",	"kurtosis_picth_arm",	"kurtosis_yaw_arm",	"skewness_roll_arm",	"skewness_pitch_arm",	"skewness_yaw_arm",	"max_roll_arm",	"max_picth_arm",	"max_yaw_arm",	"min_roll_arm",	"min_pitch_arm",	"min_yaw_arm",	"amplitude_roll_arm",	"amplitude_pitch_arm",	"amplitude_yaw_arm",	"kurtosis_roll_dumbbell",	"kurtosis_picth_dumbbell",	"kurtosis_yaw_dumbbell",	"skewness_roll_dumbbell",	"skewness_pitch_dumbbell",	"skewness_yaw_dumbbell",	"max_roll_dumbbell",	"max_picth_dumbbell",	"max_yaw_dumbbell",	"min_roll_dumbbell",	"min_pitch_dumbbell",	"min_yaw_dumbbell",	"amplitude_roll_dumbbell",	"amplitude_pitch_dumbbell",	"amplitude_yaw_dumbbell",	"var_accel_dumbbell",	"avg_roll_dumbbell",	"stddev_roll_dumbbell",	"var_roll_dumbbell",	"avg_pitch_dumbbell",	"stddev_pitch_dumbbell",	"var_pitch_dumbbell",	"avg_yaw_dumbbell",	"stddev_yaw_dumbbell",	"var_yaw_dumbbell",	"kurtosis_roll_forearm",	"kurtosis_picth_forearm",	"kurtosis_yaw_forearm",	"skewness_roll_forearm",	"skewness_pitch_forearm",	"skewness_yaw_forearm",	"max_roll_forearm",	"max_picth_forearm",	"max_yaw_forearm",	"min_roll_forearm",	"min_pitch_forearm",	"min_yaw_forearm",	"amplitude_roll_forearm",	"amplitude_pitch_forearm",	"amplitude_yaw_forearm",	"var_accel_forearm",	"avg_roll_forearm",	"stddev_roll_forearm",	"var_roll_forearm",	"avg_pitch_forearm",	"stddev_pitch_forearm",	"var_pitch_forearm",	"avg_yaw_forearm",	"stddev_yaw_forearm",	"var_yaw_forearm", "kurtosis_picth_belt",	"kurtosis_yaw_belt",	"skewness_roll_belt",	"skewness_roll_belt.1",	"skewness_yaw_belt",	"max_roll_belt",	"max_picth_belt",	"max_yaw_belt",	"min_roll_belt",	"min_pitch_belt",	"min_yaw_belt",	"amplitude_roll_belt",	"amplitude_pitch_belt",	"amplitude_yaw_belt",	"var_total_accel_belt",	"avg_roll_belt",	"stddev_roll_belt",	"var_roll_belt",	"avg_pitch_belt",	"stddev_pitch_belt",	"var_pitch_belt",	"avg_yaw_belt",	"stddev_yaw_belt",	"var_yaw_belt",	"var_accel_arm",	"avg_roll_arm",	"stddev_roll_arm", "kurtosis_picth_belt",	"kurtosis_yaw_belt",	"skewness_roll_belt",	"skewness_roll_belt.1",	"skewness_yaw_belt",	"max_roll_belt",	"max_picth_belt",	"max_yaw_belt",	"min_roll_belt",	"min_pitch_belt",	"min_yaw_belt",	"amplitude_roll_belt",	"amplitude_pitch_belt",	"amplitude_yaw_belt",	"var_total_accel_belt",	"avg_roll_belt",	"stddev_roll_belt",	"var_roll_belt",	"avg_pitch_belt",	"stddev_pitch_belt",	"var_pitch_belt",	"avg_yaw_belt",	"stddev_yaw_belt",	"var_yaw_belt",	"var_accel_arm",	"avg_roll_arm",	"stddev_roll_arm", "kurtosis_roll_belt", "raw_timestamp_part_1","raw_timestamp_part_2","cvtd_timestamp"))
+
+PMLquizcases <- select(PMLquizcases, -c("var_roll_arm",	"avg_pitch_arm",	"stddev_pitch_arm",	"var_pitch_arm",	"avg_yaw_arm",	"stddev_yaw_arm",	"var_yaw_arm",	"kurtosis_roll_arm",	"kurtosis_picth_arm",	"kurtosis_yaw_arm",	"skewness_roll_arm",	"skewness_pitch_arm",	"skewness_yaw_arm",	"max_roll_arm",	"max_picth_arm",	"max_yaw_arm",	"min_roll_arm",	"min_pitch_arm",	"min_yaw_arm",	"amplitude_roll_arm",	"amplitude_pitch_arm",	"amplitude_yaw_arm",	"kurtosis_roll_dumbbell",	"kurtosis_picth_dumbbell",	"kurtosis_yaw_dumbbell",	"skewness_roll_dumbbell",	"skewness_pitch_dumbbell",	"skewness_yaw_dumbbell",	"max_roll_dumbbell",	"max_picth_dumbbell",	"max_yaw_dumbbell",	"min_roll_dumbbell",	"min_pitch_dumbbell",	"min_yaw_dumbbell",	"amplitude_roll_dumbbell",	"amplitude_pitch_dumbbell",	"amplitude_yaw_dumbbell",	"var_accel_dumbbell",	"avg_roll_dumbbell",	"stddev_roll_dumbbell",	"var_roll_dumbbell",	"avg_pitch_dumbbell",	"stddev_pitch_dumbbell",	"var_pitch_dumbbell",	"avg_yaw_dumbbell",	"stddev_yaw_dumbbell",	"var_yaw_dumbbell",	"kurtosis_roll_forearm",	"kurtosis_picth_forearm",	"kurtosis_yaw_forearm",	"skewness_roll_forearm",	"skewness_pitch_forearm",	"skewness_yaw_forearm",	"max_roll_forearm",	"max_picth_forearm",	"max_yaw_forearm",	"min_roll_forearm",	"min_pitch_forearm",	"min_yaw_forearm",	"amplitude_roll_forearm",	"amplitude_pitch_forearm",	"amplitude_yaw_forearm",	"var_accel_forearm",	"avg_roll_forearm",	"stddev_roll_forearm",	"var_roll_forearm",	"avg_pitch_forearm",	"stddev_pitch_forearm",	"var_pitch_forearm",	"avg_yaw_forearm",	"stddev_yaw_forearm",	"var_yaw_forearm", "kurtosis_picth_belt",	"kurtosis_yaw_belt",	"skewness_roll_belt",	"skewness_roll_belt.1",	"skewness_yaw_belt",	"max_roll_belt",	"max_picth_belt",	"max_yaw_belt",	"min_roll_belt",	"min_pitch_belt",	"min_yaw_belt",	"amplitude_roll_belt",	"amplitude_pitch_belt",	"amplitude_yaw_belt",	"var_total_accel_belt",	"avg_roll_belt",	"stddev_roll_belt",	"var_roll_belt",	"avg_pitch_belt",	"stddev_pitch_belt",	"var_pitch_belt",	"avg_yaw_belt",	"stddev_yaw_belt",	"var_yaw_belt",	"var_accel_arm",	"avg_roll_arm",	"stddev_roll_arm", "kurtosis_picth_belt",	"kurtosis_yaw_belt",	"skewness_roll_belt",	"skewness_roll_belt.1",	"skewness_yaw_belt",	"max_roll_belt",	"max_picth_belt",	"max_yaw_belt",	"min_roll_belt",	"min_pitch_belt",	"min_yaw_belt",	"amplitude_roll_belt",	"amplitude_pitch_belt",	"amplitude_yaw_belt",	"var_total_accel_belt",	"avg_roll_belt",	"stddev_roll_belt",	"var_roll_belt",	"avg_pitch_belt",	"stddev_pitch_belt",	"var_pitch_belt",	"avg_yaw_belt",	"stddev_yaw_belt",	"var_yaw_belt",	"var_accel_arm",	"avg_roll_arm",	"stddev_roll_arm", "kurtosis_roll_belt", "raw_timestamp_part_1","raw_timestamp_part_2","cvtd_timestamp"))
